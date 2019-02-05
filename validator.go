@@ -990,10 +990,12 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 
 	var customTypeErrors Errors
 	optionsOrder := options.orderedKeys()
+	var processedTagsOnStruct bool
 	for _, validatorName := range optionsOrder {
 		validatorStruct := options[validatorName]
 		if validatefunc, ok := CustomTypeTagMap.Get(validatorName); ok {
 			delete(options, validatorName)
+			processedTagsOnStruct = true
 
 			if result := validatefunc(v.Interface(), o.Interface()); !result {
 				if len(validatorStruct.customErrorMessage) > 0 {
@@ -1182,8 +1184,18 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 		if v.IsNil() {
 			return true, nil
 		}
+		if v.Elem().Kind() == reflect.Struct && processedTagsOnStruct {
+			return true, nil
+		}
 		return typeCheck(v.Elem(), t, o, options)
 	case reflect.Struct:
+		// If a field which is a struct has validation tags, they will be custom tags because all built-in tags
+		// apply to non-struct types. processedTagsOnStruct will have been set to true in this case.
+		// The struct's fields will already have been validated on earlier, so return
+		// here so we don't validate those fields again and duplicate any validation errors.
+		if processedTagsOnStruct {
+			return true, nil
+		}
 		return ValidateStruct(v.Interface())
 	default:
 		return false, &UnsupportedTypeError{v.Type()}
