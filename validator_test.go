@@ -3535,3 +3535,117 @@ func TestSplitTag(t *testing.T) {
 	}
 
 }
+
+type NestedStruct struct {
+	AString string `valid:"alpha~AString: not alpha"`
+}
+
+type MainStruct struct {
+	Valid  bool
+	Nested NestedStruct `valid:"structtag~Nested: invalid struct"`
+}
+
+type MainStructPtr struct {
+	Valid     bool
+	NestedPtr *NestedStruct `valid:"structtagptr~Nested: invalid struct"`
+}
+
+func StructTag(v interface{}, o interface{}) bool {
+	main, ok := o.(MainStruct)
+	if !ok {
+		return false
+	}
+
+	return main.Valid
+}
+
+func StructTagPtr(v interface{}, o interface{}) bool {
+	main, ok := o.(MainStructPtr)
+	if !ok {
+		return false
+	}
+
+	return main.Valid
+}
+
+func TestValidatorTagOnAStructField(t *testing.T) {
+	var tt = []struct {
+		name               string
+		main               interface{}
+		expected           bool
+		expectedError      string
+		expectedErrorCount int
+	}{
+		{
+			name: "child tags not recursively run when parent struct tag passes validation",
+			main: MainStruct{
+				Valid: true, //this will make mainStruct return true
+				Nested: NestedStruct{
+					AString: "!!!", // this will return false from the alpha tag on the field in the struct
+				},
+			},
+			expected:           false,
+			expectedError:      "AString: not alpha",
+			expectedErrorCount: 1,
+		},
+		{
+			name: "child tags not recursively when a parent pointer-to-a-struct tag passes validation",
+			main: MainStructPtr{
+				Valid: true, //this will make mainStruct return true
+				NestedPtr: &NestedStruct{
+					AString: "!!!", // this will return false from the alpha tag on the field in the struct
+				},
+			},
+			expected:           false,
+			expectedError:      "AString: not alpha",
+			expectedErrorCount: 1,
+		},
+		{
+			name: "existing behaviour not broken - child tags not run recursively when tag on struct field is invalid",
+			main: MainStruct{
+				Valid: false, //this will make mainStruct return false
+				Nested: NestedStruct{
+					AString: "!!!", // this will return false from the alpha tag on the field in the struct
+				},
+			},
+			expected:           false,
+			expectedError:      "AString: not alpha;Nested: invalid struct",
+			expectedErrorCount: 2,
+		},
+		{
+			name: "all fields valid",
+			main: MainStruct{
+				Valid: true, //this will make mainStruct return true
+				Nested: NestedStruct{
+					AString: "aaa",
+				},
+			},
+			expected:           true,
+			expectedError:      "",
+			expectedErrorCount: 0,
+		},
+	}
+
+	CustomTypeTagMap.Set("structtag", StructTag)
+	CustomTypeTagMap.Set("structtagptr", StructTagPtr)
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+
+			actual, actualErrors := ValidateStruct(tc.main)
+			if actual != tc.expected {
+				t.Errorf("returned boolean unexpected. Want:\n%v\nHave\n%v", tc.expected, actual)
+			}
+
+			validatorErrors, _ := actualErrors.(Errors)
+
+			if validatorErrors.Error() != tc.expectedError {
+				t.Errorf("errors incorrect. Want\n%v\nHave\n%v", tc.expectedError, validatorErrors.Error())
+			}
+
+			if len(validatorErrors) != tc.expectedErrorCount {
+				t.Errorf("error count unexpected. Want\n%v\nHave\n%v", tc.expectedErrorCount, len(validatorErrors))
+			}
+		})
+	}
+}
