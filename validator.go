@@ -20,7 +20,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/h2so5/goback/regexp"
+	"github.com/skybet/goback/regexp"
 )
 
 var (

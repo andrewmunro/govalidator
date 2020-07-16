@@ -1,3 +1,3 @@
-# github.com/h2so5/goback v0.0.0-20150302055225-6e210305bfc9
-github.com/h2so5/goback/regexp
-github.com/h2so5/goback/regexp/syntax
+# github.com/skybet/goback v0.0.0-20200717093532-747602018047
+github.com/skybet/goback/regexp
+github.com/skybet/goback/regexp/syntax
